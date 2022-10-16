@@ -13,6 +13,7 @@ class PBDMesh:
 
         self.velocity = np.zeros_like(self.mesh.points)
 
+        # We should have a position_0 as well
         self.position_1 = self.mesh.points.copy()
 
 
@@ -50,7 +51,7 @@ def solve(rect1_mesh: PBDMesh, rect2_mesh: PBDMesh, dt: float):
     """
     Shift positions to satisfy constraints
     """
-    stitch_constraint(rect1_mesh, rect2_mesh, dt)
+    return stitch_constraint(rect1_mesh, rect2_mesh, dt)
 
 
 def post_solve(rect1_mesh: PBDMesh, rect2_mesh: PBDMesh, dt: float):
@@ -83,18 +84,20 @@ def stitch_constraint(rect1_mesh: PBDMesh, rect2_mesh: PBDMesh, dt: float):
         w1 = rect1_mesh.weights[stitch_index]
         w2 = rect2_mesh.weights[stitch_index_mesh2[it]]
 
-        x1 = rect1_mesh.mesh.points[stitch_index]
-        x2 = rect2_mesh.mesh.points[stitch_index_mesh2[it]]
+        x1 = rect1_mesh.position_1[stitch_index]
+        x2 = rect2_mesh.position_1[stitch_index_mesh2[it]]
 
         dist = np.linalg.norm(x2 - x1)
         dist_0 = 0
 
         # PBD Distance constraint with 0 distance constraint
-        delta_x1 = (w1 / (w1 + w2)) * (dist - dist_0) * (x2 - x1) / dist
-        delta_x2 = -(w2 / (w1 + w2)) * (dist - dist_0) * (x2 - x1) / dist
+        # Don't do anything if they are already stitched
+        if dist > 0:
+            delta_x1 = (w1 / (w1 + w2)) * (dist - dist_0) * (x2 - x1) / dist
+            delta_x2 = -(w2 / (w1 + w2)) * (dist - dist_0) * (x2 - x1) / dist
 
-        rect1_mesh.position_1[stitch_index] += delta_x1
-        rect2_mesh.position_1[stitch_index_mesh2[it]] += delta_x2
+            rect1_mesh.position_1[stitch_index] += delta_x1
+            rect2_mesh.position_1[stitch_index_mesh2[it]] += delta_x2
 
     return rect1_mesh, rect2_mesh
 
@@ -104,16 +107,19 @@ def simulate(rect1_mesh: PBDMesh, rect2_mesh: PBDMesh, dt: float):
     rect1_mesh, rect2_mesh = solve(rect1_mesh, rect2_mesh, dt)
     rect1_mesh, rect2_mesh = post_solve(rect1_mesh, rect2_mesh, dt)
 
+    return rect1_mesh, rect2_mesh
+
 
 if __name__ == "__main__":
     rect1_mesh, rect2_mesh = create_rectangles()
 
     dt = 1 / 10.0
-    simulate(rect1_mesh, rect2_mesh, dt)
+    rect1_mesh, rect2_mesh = simulate(rect1_mesh, rect2_mesh, dt)
+    rect1_mesh, rect2_mesh = simulate(rect1_mesh, rect2_mesh, dt)
 
     plotter = pv.Plotter()
-    plotter.add_mesh(rect1_mesh, show_edges=True)
-    plotter.add_mesh(rect2_mesh, show_edges=True)
+    plotter.add_mesh(rect1_mesh.mesh, show_edges=True)
+    plotter.add_mesh(rect2_mesh.mesh, show_edges=True)
     plotter.show()
 
     print(plotter)
