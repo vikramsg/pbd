@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "pbd"
+version = "0.1.0"
+description = ""
+authors = ["Vikram <vikramsingh001@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+pyvista = "^0.36.1"
+
+[tool.poetry.dev-dependencies]
+flake8 = "^5.0.4"
+black = "^22.10.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
