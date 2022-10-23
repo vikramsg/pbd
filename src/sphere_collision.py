@@ -5,10 +5,14 @@ from typing import List, Tuple
 # Radius of spheres
 _RADIUS = 0.1
 # Max number of objects, should be tuned
-_MAX_NUM_OBJECTS = 10
+_MAX_NUM_OBJECTS = 500
 
 _TABLE_SIZE = 2 * _MAX_NUM_OBJECTS
-_SPACING = 0.01
+_SPACING = 0.02
+_MAX_DIST = 2 * _SPACING
+
+# FIXME: Only for debugging purposes
+_SELF_COORDS = None
 
 
 def _int_coord(coord_1d: float) -> int:
@@ -23,6 +27,10 @@ def _hash_coords(x: int, y: int, z: int) -> int:
 
 
 def create_hash(coords: np.array) -> Tuple[np.array, np.array]:
+    # This seems a strange data structure which should be possible
+    # to do with a sparse column stored vector
+    # It does exactly what is mentioned in the notes.
+    # https://github.com/matthias-research/pages/blob/master/tenMinutePhysics/11-hashing.pdf
     num_objects = len(coords)
 
     cell_start = np.zeros(_TABLE_SIZE + 1, dtype=int)
@@ -45,7 +53,7 @@ def create_hash(coords: np.array) -> Tuple[np.array, np.array]:
 
     cell_start[_TABLE_SIZE] = start  # guard
 
-    # fill in objects ids
+    # fill in object ids
     for ind in range(num_objects):
         hash = _hash_coords(
             _int_coord(coords[ind][0]),
@@ -58,6 +66,45 @@ def create_hash(coords: np.array) -> Tuple[np.array, np.array]:
     return cell_start, cell_entries
 
 
+def query_collision(
+    query_coord: np.array,
+    max_dist: float,
+    cell_start: np.array,
+    cell_entries: np.array,
+) -> List[int]:
+    """For a given co-ordinate, we return all co-ordinate ids that must be checked for collision
+       FIXME:
+       The data structure does not make sense since cell_start and cell_entries only make sense
+       together with the co-ordinates
+
+    Args:
+        query_coord (np.array): coordinate to check against
+        max_dist (float): max distance for checking
+    """
+    x0 = _int_coord(query_coord[0] - max_dist)
+    y0 = _int_coord(query_coord[1] - max_dist)
+    z0 = _int_coord(query_coord[2] - max_dist)
+
+    x1 = _int_coord(query_coord[0] + max_dist)
+    y1 = _int_coord(query_coord[1] + max_dist)
+    z1 = _int_coord(query_coord[2] + max_dist)
+
+    query_ids = []
+
+    for xi in range(x0, x1):
+        for yi in range(y0, y1):
+            for zi in range(z0, z1):
+                hash = _hash_coords(xi, yi, zi)
+
+                start = cell_start[hash]
+                end = cell_start[hash + 1]
+
+                for index in range(start, end):
+                    query_ids.append(cell_entries[index])
+
+    return list(set(query_ids))
+
+
 def create_random_spheres(n: int) -> List[pv.PolyData]:
     # Create n 3D random sphere within [0, 1]**3
     random_centers = np.random.rand(n, 3)
@@ -68,11 +115,17 @@ def create_random_spheres(n: int) -> List[pv.PolyData]:
 
 
 if __name__ == "__main__":
-    n = 5
+    n = 10
     spheres = create_random_spheres(n=n)
 
     sphere_coords_list = [sphere.center for sphere in spheres]
-    create_hash(np.array(sphere_coords_list))
+    cell_start, cell_entries = create_hash(np.array(sphere_coords_list))
+
+    _SELF_COORDS = sphere_coords_list
+    query_ids = [
+        query_collision(coord, _MAX_DIST, cell_start, cell_entries)
+        for coord in sphere_coords_list
+    ]
 
     plotter = pv.Plotter()
     _ = [plotter.add_mesh(sphere, color="green") for sphere in spheres]
