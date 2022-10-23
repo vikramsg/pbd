@@ -8,8 +8,8 @@ _RADIUS = 0.1
 _MAX_NUM_OBJECTS = 500
 
 _TABLE_SIZE = 2 * _MAX_NUM_OBJECTS
-_SPACING = 0.02
-_MAX_DIST = 2 * _SPACING
+_SPACING = _RADIUS
+_MAX_DIST = 2 * _RADIUS
 
 # FIXME: Only for debugging purposes
 _SELF_COORDS = None
@@ -114,18 +114,50 @@ def create_random_spheres(n: int) -> List[pv.PolyData]:
     return spheres
 
 
+def find_collisions(coords: np.array) -> List[List[np.array]]:
+    cell_start, cell_entries = create_hash(coords)
+
+    query_ids = [
+        query_collision(coord, _MAX_DIST, cell_start, cell_entries) for coord in coords
+    ]
+
+    collisions = []
+    for index, coord in enumerate(coords):
+        query_ids_set = set(query_ids[index])
+        query_ids_set.remove(index)
+
+        coord_query_ids = list(query_ids_set)
+        if coord_query_ids:
+            for query_id in coord_query_ids:
+                if np.linalg.norm(coord - coords[query_id]) < 2 * _RADIUS:
+                    collisions.append([coord, coords[query_id]])
+
+    return collisions
+
+
 if __name__ == "__main__":
     n = 10
-    spheres = create_random_spheres(n=n)
+    centers = np.array(
+        [
+            [0.7, 0.6, 0.0],
+            [0.2, 0.1, 0.1],
+            [0.7, 0.6, 0.1],
+            [0.3, 0.2, 0.6],
+            [0.2, 0.3, 0.9],
+            [0.2, 0.0, 0.3],
+            [0.9, 0.1, 0.7],
+            [0.2, 0.7, 0.4],
+            [0.0, 0.6, 0.4],
+            [0.9, 0.6, 0.6],
+        ]
+    )
 
+    _RADIUS = 0.1
+    spheres = [pv.Sphere(radius=_RADIUS, center=center) for center in centers]
     sphere_coords_list = [sphere.center for sphere in spheres]
-    cell_start, cell_entries = create_hash(np.array(sphere_coords_list))
-
     _SELF_COORDS = sphere_coords_list
-    query_ids = [
-        query_collision(coord, _MAX_DIST, cell_start, cell_entries)
-        for coord in sphere_coords_list
-    ]
+
+    query_ids = find_collisions(np.array(sphere_coords_list))
 
     plotter = pv.Plotter()
     _ = [plotter.add_mesh(sphere, color="green") for sphere in spheres]
