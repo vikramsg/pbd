@@ -123,14 +123,14 @@ def find_collisions(coords: np.array) -> List[List[np.array]]:
 
     collisions = []
     for index, coord in enumerate(coords):
-        query_ids_set = set(query_ids[index])
-        query_ids_set.remove(index)
+        # Remove self
+        query_ids_set = set(query_ids[index]) - {index}
 
         coord_query_ids = list(query_ids_set)
         if coord_query_ids:
             for query_id in coord_query_ids:
                 if np.linalg.norm(coord - coords[query_id]) < 2 * _RADIUS:
-                    collisions.append([coord, coords[query_id]])
+                    collisions.append([index, query_id])
 
     return collisions
 
@@ -159,8 +159,21 @@ if __name__ == "__main__":
 
     query_ids = find_collisions(np.array(sphere_coords_list))
 
+    query_ids_set = set([id for collision_pair in query_ids for id in collision_pair])
+    all_ids_set = {i for i in range(len(sphere_coords_list))}
+
+    green_sphere_ids = all_ids_set - query_ids_set
+    yellow_sphere_ids = query_ids_set.copy()
+
     plotter = pv.Plotter()
-    _ = [plotter.add_mesh(sphere, color="green") for sphere in spheres]
+    _ = [
+        plotter.add_mesh(spheres[sphere_id], color="green")
+        for sphere_id in green_sphere_ids
+    ]
+    _ = [
+        plotter.add_mesh(spheres[sphere_id], color="yellow")
+        for sphere_id in yellow_sphere_ids
+    ]
     cube = pv.Cube(center=(0.5, 0.5, 0.5))
     plotter.add_mesh(cube, opacity=0.25)
     plotter.show()
