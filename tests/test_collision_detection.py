@@ -29,4 +29,5 @@ def test_sphere_collision():
     query_ids = find_collisions(np.array(sphere_coords_list))
 
     # THEN
-    assert 1 == 1
+    query_ids_set = set([id for collision_pair in query_ids for id in collision_pair])
+    assert sorted(query_ids_set) == sorted({0, 2})
