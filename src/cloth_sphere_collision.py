@@ -1,9 +1,13 @@
+from typing import List
+from pyparsing import col
 import pyvista as pv
 import numpy as np
 
+from src.sphere_collision import find_collisions
+
 
 class PBDMesh:
-    def __init__(self, mesh: pv.PolyData):
+    def __init__(self, mesh: pv.PolyData, velocity: List[float] = [0.0, 0.0, 0.0]):
         self.mesh = mesh
 
         # Each point must have a weight
@@ -11,7 +15,7 @@ class PBDMesh:
         # Maybe it makes more sense to have inverse weight
         self.weights = np.ones(self.mesh.n_points)
 
-        self.velocity = np.zeros_like(self.mesh.points)
+        self.velocity = np.tile(velocity, self.mesh.n_points).reshape(-1, 3)
 
         self.position_0 = self.mesh.points.copy()
         self.position_1 = self.mesh.points.copy()
@@ -104,12 +108,26 @@ if __name__ == "__main__":
     cloth = pv.Plane(center=(center + np.array([0, 0, 1])))
     cloth_triangles = cloth.triangulate()
 
-    cloth_PBD = PBDMesh(cloth_triangles)
-
+    cloth_PBD = PBDMesh(cloth_triangles, velocity=[0, 0, -0.5])
     sphere = pv.Sphere(radius=0.5, center=center)
 
+    dt = 0.1
+    for _ in range(25):
+        cloth_PBD = simulate(cloth_PBD, dt)
+        # FIXME: We just need to query for cloth co-ordinates
+        collisions = find_collisions(
+            hash_coords=np.concatenate((cloth_PBD.position_1, sphere.points)),
+            query_coords=cloth_PBD.position_1,
+        )
+        if collisions:
+            print(collisions)
+
     plotter = pv.Plotter()
-    plotter.add_mesh(cloth_triangles, color="green", show_edges=True)
+    plotter.add_mesh(
+        pv.PolyData(cloth_PBD.position_1, cloth_PBD.mesh.faces),
+        color="green",
+        show_edges=True,
+    )
     plotter.add_mesh(sphere, color="yellow", show_edges=True)
     plotter.show()
 

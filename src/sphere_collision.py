@@ -3,9 +3,9 @@ import pyvista as pv
 from typing import List, Tuple
 
 # Radius of spheres
-_RADIUS = 0.1
+_RADIUS = 0.01
 # Max number of objects, should be tuned
-_MAX_NUM_OBJECTS = 500
+_MAX_NUM_OBJECTS = 10000
 
 _TABLE_SIZE = 2 * _MAX_NUM_OBJECTS
 _SPACING = _RADIUS
@@ -105,16 +105,31 @@ def query_collision(
     return list(set(query_ids))
 
 
-def create_random_spheres(n: int) -> List[pv.PolyData]:
-    # Create n 3D random sphere within [0, 1]**3
-    random_centers = np.random.rand(n, 3)
+def find_collisions(
+    hash_coords: np.array, query_coords: np.array
+) -> List[List[np.array]]:
+    cell_start, cell_entries = create_hash(hash_coords)
 
-    spheres = [pv.Sphere(radius=_RADIUS, center=center) for center in random_centers]
+    query_ids = [
+        query_collision(coord, _MAX_DIST, cell_start, cell_entries)
+        for coord in query_coords
+    ]
 
-    return spheres
+    collisions = []
+    for index, coord in enumerate(query_coords):
+        # Remove self
+        query_ids_set = set(query_ids[index]) - {index}
+
+        coord_query_ids = list(query_ids_set)
+        if coord_query_ids:
+            for query_id in coord_query_ids:
+                if np.linalg.norm(coord - hash_coords[query_id]) < 2 * _RADIUS:
+                    collisions.append([index, query_id])
+
+    return collisions
 
 
-def find_collisions(coords: np.array) -> List[List[np.array]]:
+def find_collisions_merged_coords(coords: np.array) -> List[List[np.array]]:
     cell_start, cell_entries = create_hash(coords)
 
     query_ids = [
