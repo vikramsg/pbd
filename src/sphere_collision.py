@@ -3,7 +3,7 @@ import pyvista as pv
 from typing import List, Tuple
 
 # Radius of spheres
-_RADIUS = 0.01
+_RADIUS = 0.025
 # Max number of objects, should be tuned
 _MAX_NUM_OBJECTS = 10000
 
@@ -105,9 +105,7 @@ def query_collision(
     return list(set(query_ids))
 
 
-def find_collisions(
-    hash_coords: np.array, query_coords: np.array
-) -> List[List[np.array]]:
+def find_collisions(hash_coords: np.array, query_coords: np.array) -> List[List[int]]:
     cell_start, cell_entries = create_hash(hash_coords)
 
     query_ids = [

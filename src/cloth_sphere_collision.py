@@ -7,7 +7,9 @@ from src.sphere_collision import find_collisions
 
 
 class PBDMesh:
-    def __init__(self, mesh: pv.PolyData, velocity: List[float] = [0.0, 0.0, 0.0]):
+    def __init__(
+        self, mesh: pv.PolyData, velocity: List[float] = [0.0, 0.0, 0.0]
+    ) -> None:
         self.mesh = mesh
 
         # Each point must have a weight
@@ -22,13 +24,13 @@ class PBDMesh:
 
         self.edges = self.extract_edges(self.mesh)
 
-    def extract_edges(self, mesh: pv.PolyData):
+    def extract_edges(self, mesh: pv.PolyData) -> np.ndarray:
         edges = mesh.extract_all_edges()
 
         return edges.lines.reshape(-1, 3)[:, 1:]
 
 
-def pre_solve(cloth: PBDMesh, dt: float):
+def pre_solve(cloth: PBDMesh, dt: float) -> PBDMesh:
     """
     This is the velocity predictor step with g=0
     Eventually we will have just one cloth mesh that
@@ -43,7 +45,7 @@ def pre_solve(cloth: PBDMesh, dt: float):
     return cloth
 
 
-def solve(cloth: PBDMesh, dt: float):
+def solve(cloth: PBDMesh, dt: float) -> PBDMesh:
     """
     Shift positions to satisfy constraints
     """
@@ -51,7 +53,7 @@ def solve(cloth: PBDMesh, dt: float):
     return cloth
 
 
-def post_solve(cloth: PBDMesh, dt: float):
+def post_solve(cloth: PBDMesh, dt: float) -> PBDMesh:
     """
     Calculate velocity from positions
     """
@@ -61,7 +63,7 @@ def post_solve(cloth: PBDMesh, dt: float):
     return cloth
 
 
-def rest_mesh_constraint(mesh: PBDMesh):
+def rest_mesh_constraint(mesh: PBDMesh) -> PBDMesh:
     for edge in mesh.edges:
         point_0 = mesh.position_1[edge[0]]
         point_1 = mesh.position_1[edge[1]]
@@ -85,7 +87,7 @@ def rest_mesh_constraint(mesh: PBDMesh):
     return mesh
 
 
-def rest_length_constraint(cloth: PBDMesh, dt: float):
+def rest_length_constraint(cloth: PBDMesh, dt: float) -> PBDMesh:
     """
     We want the edge lengths to try to get back to original length
     """
@@ -94,9 +96,29 @@ def rest_length_constraint(cloth: PBDMesh, dt: float):
     return cloth
 
 
-def simulate(cloth: PBDMesh, dt: float):
+def solve_collisions(cloth: PBDMesh, collision_ids: List[int]):
+    """
+    1. To start with, we will just reset position_1 to position_0
+    2. This could get janky but we don't care right now.
+    3. Ideally we should only move it to just above the obstacle
+    """
+    for collision in collision_ids:
+        cloth.position_1[collision[0]] = cloth.position_0[collision[0]].copy()
+
+    return cloth
+
+
+def simulate(cloth: PBDMesh, sphere: pv.PolyData, dt: float) -> None:
     cloth = pre_solve(cloth, dt)
     cloth = solve(cloth, dt)
+
+    collision_ids_list = find_collisions(
+        hash_coords=np.concatenate((cloth_PBD.position_1, sphere.points)),
+        query_coords=cloth_PBD.position_1,
+    )
+    if collision_ids_list:
+        cloth = solve_collisions(cloth, collision_ids_list)
+
     cloth = post_solve(cloth, dt)
 
     return cloth
@@ -105,7 +127,13 @@ def simulate(cloth: PBDMesh, dt: float):
 if __name__ == "__main__":
     center = np.array([0, 0, 0])
 
-    cloth = pv.Plane(center=(center + np.array([0, 0, 1])))
+    cloth = pv.Plane(
+        center=(center + np.array([0, 0, 1])),
+        i_size=2.5,
+        j_size=2.5,
+        i_resolution=25,
+        j_resolution=25,
+    )
     cloth_triangles = cloth.triangulate()
 
     cloth_PBD = PBDMesh(cloth_triangles, velocity=[0, 0, -0.5])
@@ -113,14 +141,7 @@ if __name__ == "__main__":
 
     dt = 0.1
     for _ in range(25):
-        cloth_PBD = simulate(cloth_PBD, dt)
-        # FIXME: We just need to query for cloth co-ordinates
-        collisions = find_collisions(
-            hash_coords=np.concatenate((cloth_PBD.position_1, sphere.points)),
-            query_coords=cloth_PBD.position_1,
-        )
-        if collisions:
-            print(collisions)
+        cloth_PBD = simulate(cloth_PBD, sphere, dt)
 
     plotter = pv.Plotter()
     plotter.add_mesh(
