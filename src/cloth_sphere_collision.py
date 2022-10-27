@@ -3,31 +3,7 @@ from pyparsing import col
 import pyvista as pv
 import numpy as np
 
-from src.sphere_collision import find_collisions
-
-
-class PBDMesh:
-    def __init__(
-        self, mesh: pv.PolyData, velocity: List[float] = [0.0, 0.0, 0.0]
-    ) -> None:
-        self.mesh = mesh
-
-        # Each point must have a weight
-        # If the point is static, its inverse must be 0
-        # Maybe it makes more sense to have inverse weight
-        self.weights = np.ones(self.mesh.n_points)
-
-        self.velocity = np.tile(velocity, self.mesh.n_points).reshape(-1, 3)
-
-        self.position_0 = self.mesh.points.copy()
-        self.position_1 = self.mesh.points.copy()
-
-        self.edges = self.extract_edges(self.mesh)
-
-    def extract_edges(self, mesh: pv.PolyData) -> np.ndarray:
-        edges = mesh.extract_all_edges()
-
-        return edges.lines.reshape(-1, 3)[:, 1:]
+from src.pbd import PBDMesh, find_collisions
 
 
 def pre_solve(cloth: PBDMesh, dt: float) -> PBDMesh:
