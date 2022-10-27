@@ -7,12 +7,17 @@ from src.pbd import pre_solve
 
 
 class Scene:
-    def __init__(self, entities: List[PBDMesh]) -> None:
+    def __init__(self, entities: List[PBDMesh], obstacle: pv.PolyData) -> None:
         self.entities = entities
+
+        self.obstacle = obstacle
 
 
 def simulate(scene: Scene, dt: float) -> Scene:
-    return Scene([pre_solve(entity, dt) for entity in scene.entities])
+    return Scene(
+        entities=[pre_solve(entity, dt) for entity in scene.entities],
+        obstacle=scene.obstacle,
+    )
 
 
 if __name__ == "__main__":
@@ -41,8 +46,13 @@ if __name__ == "__main__":
     cloth_1_PBD = PBDMesh(cloth_1_triangles, velocity=[-0.5, 0, 0])
     cloth_2_PBD = PBDMesh(cloth_2_triangles, velocity=[0.5, 0, 0])
 
+    cylinder = pv.Tube(
+        pointa=(0, 0, -0.5), pointb=(0, 0, 0.5), radius=0.5, resolution=25, n_sides=25
+    )
+    cylinder_triangles = cylinder.triangulate()
+
     dt = 0.1
-    scene = Scene([cloth_1_PBD, cloth_2_PBD])
+    scene = Scene(entities=[cloth_1_PBD, cloth_2_PBD], obstacle=cylinder_triangles)
 
     for _ in range(10):
         scene = simulate(scene, dt)
@@ -55,6 +65,12 @@ if __name__ == "__main__":
             color="green",
             show_edges=True,
         )
+    plotter.add_mesh(
+        scene.obstacle,
+        color="yellow",
+        show_edges=True,
+    )
+
     plotter.show()
 
     print(scene)
