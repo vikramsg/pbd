@@ -4,12 +4,15 @@ import pyvista as pv
 import numpy as np
 
 # Radius of spheres
-_RADIUS = 0.05
+_RADIUS = 0.02
 # Max number of objects, should be tuned
 _MAX_NUM_OBJECTS = 10000
 
 _TABLE_SIZE = 2 * _MAX_NUM_OBJECTS
-_SPACING = _RADIUS
+
+_CELL_SIZE = 0.05
+# 3D Mesh spacing
+_SPACING = _CELL_SIZE
 _MAX_DIST = 2 * _RADIUS
 
 
@@ -159,13 +162,13 @@ def query_collision(
         query_coord (np.array): coordinate to check against
         max_dist (float): max distance for checking
     """
-    x0 = _int_coord(query_coord[0] - max_dist)
-    y0 = _int_coord(query_coord[1] - max_dist)
-    z0 = _int_coord(query_coord[2] - max_dist)
+    x0 = _int_coord(query_coord[0] - _SPACING)
+    y0 = _int_coord(query_coord[1] - _SPACING)
+    z0 = _int_coord(query_coord[2] - _SPACING)
 
-    x1 = _int_coord(query_coord[0] + max_dist)
-    y1 = _int_coord(query_coord[1] + max_dist)
-    z1 = _int_coord(query_coord[2] + max_dist)
+    x1 = _int_coord(query_coord[0] + _SPACING)
+    y1 = _int_coord(query_coord[1] + _SPACING)
+    z1 = _int_coord(query_coord[2] + _SPACING)
 
     query_ids = []
 

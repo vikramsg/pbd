@@ -3,7 +3,7 @@ from pyparsing import col
 import pyvista as pv
 import numpy as np
 
-from src.pbd import PBDMesh, find_collisions
+from src.pbd import _MAX_DIST, PBDMesh, find_collisions
 
 
 def pre_solve(cloth: PBDMesh, dt: float) -> PBDMesh:
@@ -29,12 +29,17 @@ def solve(cloth: PBDMesh, dt: float) -> PBDMesh:
     return cloth
 
 
-def post_solve(cloth: PBDMesh, dt: float) -> PBDMesh:
+def post_solve(cloth: PBDMesh, dt: float, max_dist: float = 50) -> PBDMesh:
     """
     Calculate velocity from positions
     """
 
     cloth.velocity = (cloth.position_1 - cloth.position_0) / dt
+
+    max_vel = 0.5 * max_dist / dt
+
+    exceed_vel_array = np.nonzero(cloth.velocity > max_vel)
+    cloth.velocity[exceed_vel_array] = max_vel
 
     return cloth
 
@@ -88,6 +93,7 @@ def simulate(cloth: PBDMesh, sphere: pv.PolyData, dt: float) -> None:
     cloth = pre_solve(cloth, dt)
     cloth = solve(cloth, dt)
 
+    # It cannot find collision between [0, 0, 0.5] and [0, 0, 0.5]
     collision_ids_list = find_collisions(
         hash_coords=np.concatenate((cloth_PBD.position_1, sphere.points)),
         query_coords=cloth_PBD.position_1,
@@ -95,7 +101,7 @@ def simulate(cloth: PBDMesh, sphere: pv.PolyData, dt: float) -> None:
     if collision_ids_list:
         cloth = solve_collisions(cloth, collision_ids_list)
 
-    cloth = post_solve(cloth, dt)
+    cloth = post_solve(cloth, dt, max_dist=_MAX_DIST)
 
     return cloth
 
@@ -104,20 +110,16 @@ if __name__ == "__main__":
     center = np.array([0, 0, 0])
 
     cloth = pv.Plane(
-        center=(center + np.array([0, 0, 1])),
+        center=(center + np.array([0, 0, 0.525])),
         i_size=2.5,
         j_size=2.5,
-        i_resolution=25,
-        j_resolution=25,
+        i_resolution=20,
+        j_resolution=20,
     )
     cloth_triangles = cloth.triangulate()
 
-    cloth_PBD = PBDMesh(cloth_triangles, velocity=[0, 0, -0.5])
+    cloth_PBD = PBDMesh(cloth_triangles, velocity=[0, 0, -0.25])
     sphere = pv.Sphere(radius=0.5, center=center)
-
-    dt = 0.1
-    for _ in range(25):
-        cloth_PBD = simulate(cloth_PBD, sphere, dt)
 
     plotter = pv.Plotter()
     plotter.add_mesh(
@@ -126,6 +128,20 @@ if __name__ == "__main__":
         show_edges=True,
     )
     plotter.add_mesh(sphere, color="yellow", show_edges=True)
-    plotter.show()
+    plotter.open_gif("wave.gif")
+    dt = 0.075
+    for _ in range(40):
+        cloth_PBD = simulate(cloth_PBD, sphere, dt)
+        plotter.clear()
+        plotter.add_mesh(
+            pv.PolyData(cloth_PBD.position_1, cloth_PBD.mesh.faces),
+            color="green",
+            show_edges=True,
+        )
+        plotter.add_mesh(sphere, color="yellow", show_edges=True)
+
+        plotter.write_frame()
+
+    plotter.close()
 
     print(cloth)
