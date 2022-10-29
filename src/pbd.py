@@ -4,7 +4,7 @@ import pyvista as pv
 import numpy as np
 
 # Radius of spheres
-_RADIUS = 0.02
+_RADIUS = 0.05
 # Max number of objects, should be tuned
 _MAX_NUM_OBJECTS = 10000
 
@@ -222,7 +222,9 @@ def solve_collisions_for_ids(cloth: PBDMesh, collision_ids: List[int]) -> PBDMes
 
 def solve_collisions(cloth: PBDMesh, obstacle: pv.PolyData, dt: float) -> PBDMesh:
     collision_ids_list = find_collisions(
-        hash_coords=np.concatenate((cloth.position_1, obstacle.points)),
+        # We will not deal with self collisions right now
+        # hash_coords=np.concatenate((cloth.position_1, obstacle.points)),
+        hash_coords=obstacle.points,
         query_coords=cloth.position_1,
     )
     if collision_ids_list:

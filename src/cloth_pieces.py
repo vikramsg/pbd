@@ -34,7 +34,7 @@ if __name__ == "__main__":
     center = np.array([0, 0, 0])
 
     cloth_1 = pv.Plane(
-        center=(center + np.array([1, 0, 0])),
+        center=(center + np.array([0.6, 0, 0])),
         direction=(1, 0, 0),
         i_size=2.5,
         j_size=2.5,
@@ -44,7 +44,7 @@ if __name__ == "__main__":
     cloth_1_triangles = cloth_1.triangulate()
 
     cloth_2 = pv.Plane(
-        center=(center - np.array([1, 0, 0])),
+        center=(center - np.array([0.6, 0, 0])),
         direction=(1, 0, 0),
         i_size=2.5,
         j_size=2.5,
@@ -53,15 +53,15 @@ if __name__ == "__main__":
     )
     cloth_2_triangles = cloth_2.triangulate()
 
-    cloth_1_PBD = PBDMesh(cloth_1_triangles, velocity=[-0.5, 0, 0])
-    cloth_2_PBD = PBDMesh(cloth_2_triangles, velocity=[0.5, 0, 0])
+    cloth_1_PBD = PBDMesh(cloth_1_triangles, velocity=[-0.25, 0, 0])
+    cloth_2_PBD = PBDMesh(cloth_2_triangles, velocity=[0.25, 0, 0])
 
     cylinder = pv.Tube(
-        pointa=(0, 0, -0.5), pointb=(0, 0, 0.5), radius=0.5, resolution=25, n_sides=25
+        pointa=(0, 0, -0.5), pointb=(0, 0, 0.5), radius=0.5, resolution=30, n_sides=45
     )
     cylinder_triangles = cylinder.triangulate()
 
-    dt = 0.1
+    dt = 0.075
     scene = Scene(entities=[cloth_1_PBD, cloth_2_PBD], obstacle=cylinder_triangles)
 
     for _ in range(20):
