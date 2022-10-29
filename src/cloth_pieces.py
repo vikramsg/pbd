@@ -1,9 +1,8 @@
 from typing import List
-from src.pbd import PBDMesh
 import pyvista as pv
 import numpy as np
 
-from src.pbd import pre_solve
+from src.pbd import PBDMesh, solve_collisions, pre_solve, solve
 
 
 class Scene:
@@ -14,10 +13,21 @@ class Scene:
 
 
 def simulate(scene: Scene, dt: float) -> Scene:
-    return Scene(
+    scene = Scene(
         entities=[pre_solve(entity, dt) for entity in scene.entities],
         obstacle=scene.obstacle,
     )
+    scene = Scene(
+        entities=[solve(entity, dt) for entity in scene.entities],
+        obstacle=scene.obstacle,
+    )
+    scene = Scene(
+        entities=[
+            solve_collisions(entity, scene.obstacle, dt) for entity in scene.entities
+        ],
+        obstacle=scene.obstacle,
+    )
+    return scene
 
 
 if __name__ == "__main__":
@@ -54,7 +64,7 @@ if __name__ == "__main__":
     dt = 0.1
     scene = Scene(entities=[cloth_1_PBD, cloth_2_PBD], obstacle=cylinder_triangles)
 
-    for _ in range(10):
+    for _ in range(20):
         scene = simulate(scene, dt)
         print(scene.entities[0].position_1[0], scene.entities[1].position_1[0])
 
