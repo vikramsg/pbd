@@ -3,7 +3,7 @@ import pyvista as pv
 import numpy as np
 from src.mesh_utils import matching_points
 
-from src.pbd import PBDMesh, solve_collisions, pre_solve, solve
+from src.pbd import _MAX_DIST, PBDMesh, post_solve, solve_collisions, pre_solve, solve
 
 
 class Scene:
@@ -79,6 +79,7 @@ def simulate(scene: Scene, dt: float) -> Scene:
         obstacle=scene.obstacle,
         stitching_points=scene.stitching_points,
     )
+    # ToDo: this should go in solve somehow
     scene = Scene(
         entities=[
             solve_collisions(entity, scene.obstacle, dt) for entity in scene.entities
@@ -86,6 +87,25 @@ def simulate(scene: Scene, dt: float) -> Scene:
         obstacle=scene.obstacle,
         stitching_points=scene.stitching_points,
     )
+    # ToDo: this should go in solve somehow
+    scene = Scene(
+        entities=[
+            mesh
+            for mesh in stitch_constraint(
+                scene.entities[0], scene.entities[1], scene.stitching_points, dt
+            )
+        ],
+        obstacle=scene.obstacle,
+        stitching_points=scene.stitching_points,
+    )
+    scene = Scene(
+        entities=[
+            post_solve(entity, dt, max_dist=_MAX_DIST) for entity in scene.entities
+        ],
+        obstacle=scene.obstacle,
+        stitching_points=scene.stitching_points,
+    )
+
     return scene
 
 

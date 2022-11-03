@@ -96,6 +96,21 @@ def solve(cloth: PBDMesh, dt: float) -> PBDMesh:
     return cloth
 
 
+def post_solve(cloth: PBDMesh, dt: float, max_dist: float = 50) -> PBDMesh:
+    """
+    Calculate velocity from positions
+    """
+
+    cloth.velocity = (cloth.position_1 - cloth.position_0) / dt
+
+    max_vel = 0.5 * max_dist / dt
+
+    exceed_vel_array = np.nonzero(cloth.velocity > max_vel)
+    cloth.velocity[exceed_vel_array] = max_vel
+
+    return cloth
+
+
 def _int_coord(coord_1d: float) -> int:
     return int(np.floor(coord_1d / _SPACING))
 
