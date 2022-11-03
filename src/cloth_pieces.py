@@ -1,31 +1,90 @@
-from typing import List
+from typing import List, Tuple
 import pyvista as pv
 import numpy as np
+from src.mesh_utils import matching_points
 
 from src.pbd import PBDMesh, solve_collisions, pre_solve, solve
 
 
 class Scene:
-    def __init__(self, entities: List[PBDMesh], obstacle: pv.PolyData) -> None:
+    def __init__(
+        self,
+        entities: List[PBDMesh],
+        obstacle: pv.PolyData,
+        stitching_points: List[Tuple[int]],
+    ) -> None:
         self.entities = entities
 
         self.obstacle = obstacle
+
+        self.stitching_points = stitching_points
+
+
+def stitch_constraint(
+    rect1_mesh: PBDMesh,
+    rect2_mesh: PBDMesh,
+    stitch_index_list: List[Tuple[int]],
+    dt: float,
+):
+    """
+    We'll stitch point [1, 0, 0] and [1, 1, 0] with [2, 0, 0] and [2, 1, 0]
+
+    The way PBD works is that we have to update the position of each point
+    Then at the end, after satisfying all constraints, we get the velocity
+    by subtracting new position with old position. Then we step using this velocity
+    """
+
+    compliance_stiffness = 1.0 / dt / dt
+
+    for stitch_index in stitch_index_list:
+        w1 = rect1_mesh.weights[stitch_index[0]]
+        w2 = rect2_mesh.weights[stitch_index[1]]
+
+        x1 = rect1_mesh.position_1[stitch_index[0]]
+        x2 = rect2_mesh.position_1[stitch_index[1]]
+
+        dist = np.linalg.norm(x2 - x1)
+        dist_0 = 0
+
+        # PBD Distance constraint with 0 distance constraint
+        # Don't do anything if they are already stitched
+        if dist > 0:
+            delta_x1 = (
+                (w1 / (w1 + w2 + compliance_stiffness))
+                * (dist - dist_0)
+                * (x2 - x1)
+                / dist
+            )
+            delta_x2 = (
+                -(w2 / (w1 + w2 + compliance_stiffness))
+                * (dist - dist_0)
+                * (x2 - x1)
+                / dist
+            )
+
+            rect1_mesh.position_1[stitch_index[0]] += delta_x1
+            rect2_mesh.position_1[stitch_index[1]] += delta_x2
+
+    return rect1_mesh, rect2_mesh
 
 
 def simulate(scene: Scene, dt: float) -> Scene:
     scene = Scene(
         entities=[pre_solve(entity, dt) for entity in scene.entities],
         obstacle=scene.obstacle,
+        stitching_points=scene.stitching_points,
     )
     scene = Scene(
         entities=[solve(entity, dt) for entity in scene.entities],
         obstacle=scene.obstacle,
+        stitching_points=scene.stitching_points,
     )
     scene = Scene(
         entities=[
             solve_collisions(entity, scene.obstacle, dt) for entity in scene.entities
         ],
         obstacle=scene.obstacle,
+        stitching_points=scene.stitching_points,
     )
     return scene
 
@@ -53,6 +112,8 @@ if __name__ == "__main__":
     )
     cloth_2_triangles = cloth_2.triangulate()
 
+    stitching_points = matching_points(cloth_1_triangles, cloth_2_triangles)
+
     cloth_1_PBD = PBDMesh(cloth_1_triangles, velocity=[-0.25, 0, 0])
     cloth_2_PBD = PBDMesh(cloth_2_triangles, velocity=[0.25, 0, 0])
 
@@ -62,7 +123,11 @@ if __name__ == "__main__":
     cylinder_triangles = cylinder.triangulate()
 
     dt = 0.075
-    scene = Scene(entities=[cloth_1_PBD, cloth_2_PBD], obstacle=cylinder_triangles)
+    scene = Scene(
+        entities=[cloth_1_PBD, cloth_2_PBD],
+        obstacle=cylinder_triangles,
+        stitching_points=stitching_points,
+    )
 
     for _ in range(20):
         scene = simulate(scene, dt)
