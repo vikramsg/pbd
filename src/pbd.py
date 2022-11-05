@@ -103,10 +103,19 @@ def post_solve(cloth: PBDMesh, dt: float, max_dist: float = 50) -> PBDMesh:
 
     cloth.velocity = (cloth.position_1 - cloth.position_0) / dt
 
-    max_vel = 0.5 * max_dist / dt
+    # 0.25 is just a tuning parameter
+    max_vel = 0.25 * max_dist / dt
 
-    exceed_vel_array = np.nonzero(cloth.velocity > max_vel)
-    cloth.velocity[exceed_vel_array] = max_vel
+    vel_norm = np.linalg.norm(cloth.velocity, axis=1)
+    exceed_vel_array = np.nonzero(vel_norm > max_vel)
+
+    # Limit velocity
+    cloth.velocity[exceed_vel_array] = (
+        cloth.velocity[exceed_vel_array]
+        * max_vel
+        # Convert to column vector
+        / vel_norm[exceed_vel_array].reshape(-1, 1)
+    )
 
     return cloth
 

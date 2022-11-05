@@ -132,7 +132,9 @@ if __name__ == "__main__":
     )
     cloth_2_triangles = cloth_2.triangulate()
 
-    stitching_points = matching_points(cloth_1_triangles, cloth_2_triangles)
+    stitching_points_full = matching_points(cloth_1_triangles, cloth_2_triangles)
+    stitching_points = [(0, 0), (650, 650)]
+    # stitching_points = stitching_points_full
 
     cloth_1_PBD = PBDMesh(cloth_1_triangles, velocity=[-0.25, 0, 0])
     cloth_2_PBD = PBDMesh(cloth_2_triangles, velocity=[0.25, 0, 0])
@@ -149,9 +151,10 @@ if __name__ == "__main__":
         stitching_points=stitching_points,
     )
 
-    for _ in range(20):
+    for _ in range(30):
         scene = simulate(scene, dt)
         print(scene.entities[0].position_1[0], scene.entities[1].position_1[0])
+        print("velocity", scene.entities[0].velocity[0], scene.entities[1].velocity[0])
 
     plotter = pv.Plotter()
     for entity in scene.entities:
