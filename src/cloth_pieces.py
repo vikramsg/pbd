@@ -62,8 +62,18 @@ def stitch_constraint(
                 / dist
             )
 
+            print(
+                "position 0",
+                rect1_mesh.position_1[stitch_index[0]],
+                rect2_mesh.position_1[stitch_index[1]],
+            )
             rect1_mesh.position_1[stitch_index[0]] += delta_x1
             rect2_mesh.position_1[stitch_index[1]] += delta_x2
+            print(
+                "position 1",
+                rect1_mesh.position_1[stitch_index[0]],
+                rect2_mesh.position_1[stitch_index[1]],
+            )
 
     return rect1_mesh, rect2_mesh
 

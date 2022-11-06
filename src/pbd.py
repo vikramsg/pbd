@@ -56,6 +56,8 @@ def pre_solve(cloth: PBDMesh, dt: float) -> PBDMesh:
 
 
 def rest_mesh_constraint(mesh: PBDMesh) -> PBDMesh:
+    # FIXME: This is really slow. Can we reformat to pose this as a numpy function
+    # I think it can be done, just some refactor required
     for edge in mesh.edges:
         point_0 = mesh.position_1[edge[0]]
         point_1 = mesh.position_1[edge[1]]
@@ -79,11 +81,54 @@ def rest_mesh_constraint(mesh: PBDMesh) -> PBDMesh:
     return mesh
 
 
+def rest_mesh_constraint_fast(mesh: PBDMesh) -> PBDMesh:
+    mesh_edge_points_0 = mesh.position_1[mesh.edges[:, 0]]
+    mesh_edge_points_1 = mesh.position_1[mesh.edges[:, 1]]
+
+    orig_mesh_edge_points_0 = mesh.mesh.points[mesh.edges[:, 0]]
+    orig_mesh_edge_points_1 = mesh.mesh.points[mesh.edges[:, 1]]
+
+    mesh_weights_0 = mesh.weights[mesh.edges[:, 0]]
+    mesh_weights_1 = mesh.weights[mesh.edges[:, 1]]
+
+    mesh_dist = np.linalg.norm(mesh_edge_points_0 - mesh_edge_points_1, axis=1)
+    orig_mesh_dist = np.linalg.norm(
+        orig_mesh_edge_points_0 - orig_mesh_edge_points_1, axis=1
+    )
+
+    exceed_0_indices = np.nonzero(mesh_dist > orig_mesh_dist)
+
+    inv_w0_plus_w1 = 1.0 / (mesh_weights_0 + mesh_weights_1)
+
+    delta_x0 = (
+        (mesh_edge_points_1 - mesh_edge_points_0)
+        * (
+            ((mesh_weights_0 * inv_w0_plus_w1) * (mesh_dist - orig_mesh_dist))
+            / mesh_dist
+        ).reshape(-1, 1)
+    )[exceed_0_indices]
+    delta_x1 = (
+        -1
+        * (
+            (mesh_edge_points_1 - mesh_edge_points_0)
+            * (
+                ((mesh_weights_1 * inv_w0_plus_w1) * (mesh_dist - orig_mesh_dist))
+                / mesh_dist
+            ).reshape(-1, 1)
+        )[exceed_0_indices]
+    )
+
+    mesh_edge_points_0 = delta_x0
+    mesh_edge_points_1 = delta_x1
+
+    return mesh
+
+
 def rest_length_constraint(cloth: PBDMesh, dt: float) -> PBDMesh:
     """
     We want the edge lengths to try to get back to original length
     """
-    cloth = rest_mesh_constraint(cloth)
+    cloth = rest_mesh_constraint_fast(cloth)
 
     return cloth
 
