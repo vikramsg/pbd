@@ -82,6 +82,9 @@ def rest_mesh_constraint(mesh: PBDMesh) -> PBDMesh:
 
 
 def rest_mesh_constraint_fast(mesh: PBDMesh) -> PBDMesh:
+    # FIXME: There maybe a race condition here, we need to do this
+    # for each edge, but the same point could be going through it multiple times
+    # So we may be overwriting delta_x0, x1
     mesh_edge_points_0 = mesh.position_1[mesh.edges[:, 0]]
     mesh_edge_points_1 = mesh.position_1[mesh.edges[:, 1]]
 
@@ -91,35 +94,60 @@ def rest_mesh_constraint_fast(mesh: PBDMesh) -> PBDMesh:
     mesh_weights_0 = mesh.weights[mesh.edges[:, 0]]
     mesh_weights_1 = mesh.weights[mesh.edges[:, 1]]
 
-    mesh_dist = np.linalg.norm(mesh_edge_points_0 - mesh_edge_points_1, axis=1)
+    mesh_dist = np.linalg.norm(mesh_edge_points_1 - mesh_edge_points_0, axis=1)
     orig_mesh_dist = np.linalg.norm(
-        orig_mesh_edge_points_0 - orig_mesh_edge_points_1, axis=1
+        orig_mesh_edge_points_1 - orig_mesh_edge_points_0, axis=1
     )
-
-    exceed_0_indices = np.nonzero(mesh_dist > orig_mesh_dist)
 
     inv_w0_plus_w1 = 1.0 / (mesh_weights_0 + mesh_weights_1)
 
-    delta_x0 = (
+    delta_x0 = (mesh_edge_points_1 - mesh_edge_points_0) * (
+        ((mesh_weights_0 * inv_w0_plus_w1) * (mesh_dist - orig_mesh_dist)) / mesh_dist
+    ).reshape(-1, 1)
+    delta_x1 = -1 * (
         (mesh_edge_points_1 - mesh_edge_points_0)
         * (
-            ((mesh_weights_0 * inv_w0_plus_w1) * (mesh_dist - orig_mesh_dist))
+            ((mesh_weights_1 * inv_w0_plus_w1) * (mesh_dist - orig_mesh_dist))
             / mesh_dist
         ).reshape(-1, 1)
-    )[exceed_0_indices]
-    delta_x1 = (
-        -1
-        * (
-            (mesh_edge_points_1 - mesh_edge_points_0)
-            * (
-                ((mesh_weights_1 * inv_w0_plus_w1) * (mesh_dist - orig_mesh_dist))
-                / mesh_dist
-            ).reshape(-1, 1)
-        )[exceed_0_indices]
     )
 
-    mesh_edge_points_0 = delta_x0
-    mesh_edge_points_1 = delta_x1
+    import copy
+
+    # We have to make it a per edge operation, since each point
+    # could be shared by multiple edges, and this is not allowing that
+    # But the mesh.edges should handle that. For each point we should check each
+    # time it is used
+    temp_position = copy.deepcopy(mesh.position_1)
+    temp_position[mesh.edges[:, 0]] += delta_x0
+    temp_position[mesh.edges[:, 1]] += delta_x1
+
+    # mesh.position_1[mesh.edges[:, 0]] += delta_x0
+    # mesh.position_1[mesh.edges[:, 1]] += delta_x1
+
+    temp_x1 = np.zeros_like(mesh.position_1)
+    temp_x2 = np.zeros_like(mesh.position_1)
+    for index, edge in enumerate(mesh.edges):
+        point_0 = mesh.position_1[edge[0]]
+        point_1 = mesh.position_1[edge[1]]
+
+        orig_point_0 = mesh.mesh.points[edge[0]]
+        orig_point_1 = mesh.mesh.points[edge[1]]
+
+        w1 = mesh.weights[edge[0]]
+        w2 = mesh.weights[edge[1]]
+
+        dist = np.linalg.norm(point_1 - point_0)
+        dist_0 = np.linalg.norm(orig_point_1 - orig_point_0)
+
+        if dist > 0:
+            del_x1 = (w1 / (w1 + w2)) * (dist - dist_0) * (point_1 - point_0) / dist
+            del_x2 = -(w2 / (w1 + w2)) * (dist - dist_0) * (point_1 - point_0) / dist
+
+            mesh.position_1[edge[0]] += del_x1
+            mesh.position_1[edge[1]] += del_x2
+
+    print(temp_x1)
 
     return mesh
 
