@@ -45,7 +45,7 @@ def post_solve(cloth: PBDMesh, dt: float, max_dist: float = 50) -> PBDMesh:
 
 
 def rest_mesh_constraint(mesh: PBDMesh) -> PBDMesh:
-    for edge in mesh.edges:
+    for edge in mesh.boundary_edges:
         point_0 = mesh.position_1[edge[0]]
         point_1 = mesh.position_1[edge[1]]
 

@@ -34,7 +34,7 @@ def stitch_constraint(
     by subtracting new position with old position. Then we step using this velocity
     """
 
-    compliance_stiffness = 1.0 / dt / dt
+    compliance_stiffness = 0.01 / dt / dt
 
     for stitch_index in stitch_index_list:
         w1 = rect1_mesh.weights[stitch_index[0]]
@@ -62,18 +62,8 @@ def stitch_constraint(
                 / dist
             )
 
-            print(
-                "position 0",
-                rect1_mesh.position_1[stitch_index[0]],
-                rect2_mesh.position_1[stitch_index[1]],
-            )
             rect1_mesh.position_1[stitch_index[0]] += delta_x1
             rect2_mesh.position_1[stitch_index[1]] += delta_x2
-            print(
-                "position 1",
-                rect1_mesh.position_1[stitch_index[0]],
-                rect2_mesh.position_1[stitch_index[1]],
-            )
 
     return rect1_mesh, rect2_mesh
 
@@ -90,13 +80,13 @@ def simulate(scene: Scene, dt: float) -> Scene:
         stitching_points=scene.stitching_points,
     )
     # ToDo: this should go in solve somehow
-    scene = Scene(
-        entities=[
-            solve_collisions(entity, scene.obstacle, dt) for entity in scene.entities
-        ],
-        obstacle=scene.obstacle,
-        stitching_points=scene.stitching_points,
-    )
+    # scene = Scene(
+    #     entities=[
+    #         solve_collisions(entity, scene.obstacle, dt) for entity in scene.entities
+    #     ],
+    #     obstacle=scene.obstacle,
+    #     stitching_points=scene.stitching_points,
+    # )
     # ToDo: this should go in solve somehow
     scene = Scene(
         entities=[
@@ -127,8 +117,8 @@ if __name__ == "__main__":
         direction=(1, 0, 0),
         i_size=2.5,
         j_size=2.5,
-        i_resolution=25,
-        j_resolution=25,
+        i_resolution=10,
+        j_resolution=10,
     )
     cloth_1_triangles = cloth_1.triangulate()
 
@@ -137,17 +127,18 @@ if __name__ == "__main__":
         direction=(1, 0, 0),
         i_size=2.5,
         j_size=2.5,
-        i_resolution=25,
-        j_resolution=25,
+        i_resolution=10,
+        j_resolution=10,
     )
     cloth_2_triangles = cloth_2.triangulate()
 
     stitching_points_full = matching_points(cloth_1_triangles, cloth_2_triangles)
-    stitching_points = [(0, 0), (650, 650)]
+    stitching_points = [(0, 0), (110, 110)]
+    # stitching_points = [(0, 0), (650, 650)]
     # stitching_points = stitching_points_full
 
-    cloth_1_PBD = PBDMesh(cloth_1_triangles, velocity=[-0.25, 0, 0])
-    cloth_2_PBD = PBDMesh(cloth_2_triangles, velocity=[0.25, 0, 0])
+    cloth_1_PBD = PBDMesh(cloth_1_triangles, velocity=[-0.0, 0, 0])
+    cloth_2_PBD = PBDMesh(cloth_2_triangles, velocity=[0.0, 0, 0])
 
     cylinder = pv.Tube(
         pointa=(0, 0, -0.5), pointb=(0, 0, 0.5), radius=0.5, resolution=30, n_sides=45

@@ -1,4 +1,5 @@
-from typing import List, Tuple
+from collections import defaultdict
+from typing import Dict, List, Tuple
 from pyparsing import col
 import pyvista as pv
 import numpy as np
@@ -32,12 +33,58 @@ class PBDMesh:
         self.position_0 = self.mesh.points.copy()
         self.position_1 = self.mesh.points.copy()
 
-        self.edges = self.extract_edges(self.mesh)
+        self.boundary_edges = self.extract_edges(self.mesh)
+
+        self.faces = mesh.faces.reshape(-1, 4)[:, 1:]
+
+        # For each edge determine which face it belongs to
+        self.edges_to_faces = self.get_edges_to_faces(faces=self.faces)
 
     def extract_edges(self, mesh: pv.PolyData) -> np.ndarray:
         edges = mesh.extract_all_edges()
 
         return edges.lines.reshape(-1, 3)[:, 1:]
+
+    def get_edges_to_faces(self, faces: np.ndarray) -> Dict:
+        face_dict = defaultdict(list)
+
+        # For each face, we add each edge in both directions to the dict
+        # The item in the dict is the opposite point
+        for face in faces:
+            edge_00 = (face[0], face[1])
+            edge_01 = (face[1], face[0])
+            face_dict[edge_00].append(face[2])
+            face_dict[edge_01].append(face[2])
+
+            edge_10 = (face[1], face[2])
+            edge_11 = (face[2], face[1])
+            face_dict[edge_10].append(face[0])
+            face_dict[edge_11].append(face[0])
+
+            edge_20 = (face[2], face[0])
+            edge_21 = (face[0], face[2])
+            face_dict[edge_20].append(face[1])
+            face_dict[edge_21].append(face[1])
+
+        # We find unique edges by adding the edge only once to a dict
+        unique_edge_dict = dict()
+        for edge in face_dict.keys():
+            if (
+                edge in unique_edge_dict.keys()
+                or tuple(reversed(edge)) in unique_edge_dict.keys()
+            ):
+                continue
+            else:
+                unique_edge_dict[edge] = 1
+
+        # Now we just assign to the unque edge the union of the 2 items
+        # from the face dict
+        edge_opposite_point_dict = {
+            edge: set(face_dict[edge] + face_dict[tuple(reversed(edge))])
+            for edge in unique_edge_dict.keys()
+        }
+
+        return edge_opposite_point_dict
 
 
 def pre_solve(cloth: PBDMesh, dt: float) -> PBDMesh:
@@ -56,9 +103,12 @@ def pre_solve(cloth: PBDMesh, dt: float) -> PBDMesh:
 
 
 def rest_mesh_constraint(mesh: PBDMesh) -> PBDMesh:
-    # FIXME: This is really slow. Can we reformat to pose this as a numpy function
-    # I think it can be done, just some refactor required
-    for edge in mesh.edges:
+    """
+    How can we make it faster when a position change at one point
+    affects the next time the same point is affected in the same loop
+    How would we even parallelize it?
+    """
+    for edge in mesh.boundary_edges:
         point_0 = mesh.position_1[edge[0]]
         point_1 = mesh.position_1[edge[1]]
 
@@ -81,82 +131,11 @@ def rest_mesh_constraint(mesh: PBDMesh) -> PBDMesh:
     return mesh
 
 
-def rest_mesh_constraint_fast(mesh: PBDMesh) -> PBDMesh:
-    # FIXME: There maybe a race condition here, we need to do this
-    # for each edge, but the same point could be going through it multiple times
-    # So we may be overwriting delta_x0, x1
-    mesh_edge_points_0 = mesh.position_1[mesh.edges[:, 0]]
-    mesh_edge_points_1 = mesh.position_1[mesh.edges[:, 1]]
-
-    orig_mesh_edge_points_0 = mesh.mesh.points[mesh.edges[:, 0]]
-    orig_mesh_edge_points_1 = mesh.mesh.points[mesh.edges[:, 1]]
-
-    mesh_weights_0 = mesh.weights[mesh.edges[:, 0]]
-    mesh_weights_1 = mesh.weights[mesh.edges[:, 1]]
-
-    mesh_dist = np.linalg.norm(mesh_edge_points_1 - mesh_edge_points_0, axis=1)
-    orig_mesh_dist = np.linalg.norm(
-        orig_mesh_edge_points_1 - orig_mesh_edge_points_0, axis=1
-    )
-
-    inv_w0_plus_w1 = 1.0 / (mesh_weights_0 + mesh_weights_1)
-
-    delta_x0 = (mesh_edge_points_1 - mesh_edge_points_0) * (
-        ((mesh_weights_0 * inv_w0_plus_w1) * (mesh_dist - orig_mesh_dist)) / mesh_dist
-    ).reshape(-1, 1)
-    delta_x1 = -1 * (
-        (mesh_edge_points_1 - mesh_edge_points_0)
-        * (
-            ((mesh_weights_1 * inv_w0_plus_w1) * (mesh_dist - orig_mesh_dist))
-            / mesh_dist
-        ).reshape(-1, 1)
-    )
-
-    import copy
-
-    # We have to make it a per edge operation, since each point
-    # could be shared by multiple edges, and this is not allowing that
-    # But the mesh.edges should handle that. For each point we should check each
-    # time it is used
-    temp_position = copy.deepcopy(mesh.position_1)
-    temp_position[mesh.edges[:, 0]] += delta_x0
-    temp_position[mesh.edges[:, 1]] += delta_x1
-
-    # mesh.position_1[mesh.edges[:, 0]] += delta_x0
-    # mesh.position_1[mesh.edges[:, 1]] += delta_x1
-
-    temp_x1 = np.zeros_like(mesh.position_1)
-    temp_x2 = np.zeros_like(mesh.position_1)
-    for index, edge in enumerate(mesh.edges):
-        point_0 = mesh.position_1[edge[0]]
-        point_1 = mesh.position_1[edge[1]]
-
-        orig_point_0 = mesh.mesh.points[edge[0]]
-        orig_point_1 = mesh.mesh.points[edge[1]]
-
-        w1 = mesh.weights[edge[0]]
-        w2 = mesh.weights[edge[1]]
-
-        dist = np.linalg.norm(point_1 - point_0)
-        dist_0 = np.linalg.norm(orig_point_1 - orig_point_0)
-
-        if dist > 0:
-            del_x1 = (w1 / (w1 + w2)) * (dist - dist_0) * (point_1 - point_0) / dist
-            del_x2 = -(w2 / (w1 + w2)) * (dist - dist_0) * (point_1 - point_0) / dist
-
-            mesh.position_1[edge[0]] += del_x1
-            mesh.position_1[edge[1]] += del_x2
-
-    print(temp_x1)
-
-    return mesh
-
-
 def rest_length_constraint(cloth: PBDMesh, dt: float) -> PBDMesh:
     """
     We want the edge lengths to try to get back to original length
     """
-    cloth = rest_mesh_constraint_fast(cloth)
+    cloth = rest_mesh_constraint(cloth)
 
     return cloth
 
