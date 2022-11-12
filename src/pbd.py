@@ -37,15 +37,16 @@ class PBDMesh:
 
         self.faces = mesh.faces.reshape(-1, 4)[:, 1:]
 
-        # For each edge determine which face it belongs to
-        self.edges_to_faces = self.get_edges_to_faces(faces=self.faces)
+        # For each edge determine the points opposite to it
+        # Only returns if there are 2 points opposite an edge
+        self.edge_opposite_points = self.get_edge_opposite_points(faces=self.faces)
 
     def extract_edges(self, mesh: pv.PolyData) -> np.ndarray:
         edges = mesh.extract_all_edges()
 
         return edges.lines.reshape(-1, 3)[:, 1:]
 
-    def get_edges_to_faces(self, faces: np.ndarray) -> Dict:
+    def get_edge_opposite_points(self, faces: np.ndarray) -> Dict:
         face_dict = defaultdict(list)
 
         # For each face, we add each edge in both directions to the dict
@@ -84,7 +85,14 @@ class PBDMesh:
             for edge in unique_edge_dict.keys()
         }
 
-        return edge_opposite_point_dict
+        edge_opposite_points_list = [
+            list(value)
+            for _, value in edge_opposite_point_dict.items()
+            if len(value) > 1
+        ]
+
+        # Then we just use the distance between them as constraints
+        return np.array(edge_opposite_points_list)
 
 
 def pre_solve(cloth: PBDMesh, dt: float) -> PBDMesh:
@@ -102,7 +110,7 @@ def pre_solve(cloth: PBDMesh, dt: float) -> PBDMesh:
     return cloth
 
 
-def rest_mesh_constraint(mesh: PBDMesh) -> PBDMesh:
+def rest_edge_constraint(mesh: PBDMesh) -> PBDMesh:
     """
     How can we make it faster when a position change at one point
     affects the next time the same point is affected in the same loop
@@ -131,11 +139,41 @@ def rest_mesh_constraint(mesh: PBDMesh) -> PBDMesh:
     return mesh
 
 
+def rest_bending_constraint(mesh: PBDMesh) -> PBDMesh:
+    """
+    We take points opposite an edge and do the length constraint
+    """
+    for edge_opposite_points in mesh.edge_opposite_points:
+        point_index_0 = edge_opposite_points[0]
+        point_index_1 = edge_opposite_points[1]
+
+        point_0 = mesh.position_1[point_index_0]
+        point_1 = mesh.position_1[point_index_1]
+
+        orig_point_0 = mesh.mesh.points[point_index_0]
+        orig_point_1 = mesh.mesh.points[point_index_1]
+
+        w1 = mesh.weights[point_index_0]
+        w2 = mesh.weights[point_index_1]
+
+        dist = np.linalg.norm(point_1 - point_0)
+        dist_0 = np.linalg.norm(orig_point_1 - orig_point_0)
+
+        if dist > 0:
+            delta_x1 = (w1 / (w1 + w2)) * (dist - dist_0) * (point_1 - point_0) / dist
+            delta_x2 = -(w2 / (w1 + w2)) * (dist - dist_0) * (point_1 - point_0) / dist
+
+            mesh.position_1[point_index_0] += delta_x1
+            mesh.position_1[point_index_1] += delta_x2
+
+    return mesh
+
+
 def rest_length_constraint(cloth: PBDMesh, dt: float) -> PBDMesh:
     """
     We want the edge lengths to try to get back to original length
     """
-    cloth = rest_mesh_constraint(cloth)
+    cloth = rest_edge_constraint(cloth)
 
     return cloth
 
@@ -145,6 +183,7 @@ def solve(cloth: PBDMesh, dt: float) -> PBDMesh:
     Shift positions to satisfy constraints
     """
     cloth = rest_length_constraint(cloth, dt)
+    cloth = rest_bending_constraint(cloth)
     return cloth
 
 

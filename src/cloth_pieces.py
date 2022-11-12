@@ -46,6 +46,10 @@ def stitch_constraint(
         dist = np.linalg.norm(x2 - x1)
         dist_0 = 0
 
+        # FIXME: Doing some tuning here
+        if dist < 0.1:
+            compliance_stiffness = 0
+
         # PBD Distance constraint with 0 distance constraint
         # Don't do anything if they are already stitched
         if dist > 0:
@@ -80,13 +84,13 @@ def simulate(scene: Scene, dt: float) -> Scene:
         stitching_points=scene.stitching_points,
     )
     # ToDo: this should go in solve somehow
-    # scene = Scene(
-    #     entities=[
-    #         solve_collisions(entity, scene.obstacle, dt) for entity in scene.entities
-    #     ],
-    #     obstacle=scene.obstacle,
-    #     stitching_points=scene.stitching_points,
-    # )
+    scene = Scene(
+        entities=[
+            solve_collisions(entity, scene.obstacle, dt) for entity in scene.entities
+        ],
+        obstacle=scene.obstacle,
+        stitching_points=scene.stitching_points,
+    )
     # ToDo: this should go in solve somehow
     scene = Scene(
         entities=[
@@ -115,8 +119,8 @@ if __name__ == "__main__":
     cloth_1 = pv.Plane(
         center=(center + np.array([0.6, 0, 0])),
         direction=(1, 0, 0),
-        i_size=2.5,
-        j_size=2.5,
+        i_size=2.0,
+        j_size=2.0,
         i_resolution=10,
         j_resolution=10,
     )
@@ -125,16 +129,17 @@ if __name__ == "__main__":
     cloth_2 = pv.Plane(
         center=(center - np.array([0.6, 0, 0])),
         direction=(1, 0, 0),
-        i_size=2.5,
-        j_size=2.5,
+        i_size=2.0,
+        j_size=2.0,
         i_resolution=10,
         j_resolution=10,
     )
     cloth_2_triangles = cloth_2.triangulate()
 
     stitching_points_full = matching_points(cloth_1_triangles, cloth_2_triangles)
-    stitching_points = [(0, 0), (110, 110)]
-    # stitching_points = [(0, 0), (650, 650)]
+    stitching_points = list(zip(range(11), range(11))) + list(
+        zip(range(110, 121), range(110, 121))
+    )
     # stitching_points = stitching_points_full
 
     cloth_1_PBD = PBDMesh(cloth_1_triangles, velocity=[-0.0, 0, 0])
@@ -152,7 +157,7 @@ if __name__ == "__main__":
         stitching_points=stitching_points,
     )
 
-    for _ in range(30):
+    for _ in range(20):
         scene = simulate(scene, dt)
         print(scene.entities[0].position_1[0], scene.entities[1].position_1[0])
         print("velocity", scene.entities[0].velocity[0], scene.entities[1].velocity[0])
