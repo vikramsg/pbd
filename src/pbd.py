@@ -7,7 +7,7 @@ import numpy as np
 # Radius of spheres
 _RADIUS = 0.05
 # Max number of objects, should be tuned
-_MAX_NUM_OBJECTS = 10000
+_MAX_NUM_OBJECTS = 40000
 
 _TABLE_SIZE = 2 * _MAX_NUM_OBJECTS
 
@@ -33,18 +33,47 @@ class PBDMesh:
         self.position_0 = self.mesh.points.copy()
         self.position_1 = self.mesh.points.copy()
 
-        self.boundary_edges = self.extract_edges(self.mesh)
-
         self.faces = mesh.faces.reshape(-1, 4)[:, 1:]
+
+        self.edges = self.extract_edges(self.faces)
 
         # For each edge determine the points opposite to it
         # Only returns if there are 2 points opposite an edge
         self.edge_opposite_points = self.get_edge_opposite_points(faces=self.faces)
 
-    def extract_edges(self, mesh: pv.PolyData) -> np.ndarray:
-        edges = mesh.extract_all_edges()
+    def extract_edges(self, faces: np.ndarray) -> np.ndarray:
+        face_dict = defaultdict(list)
 
-        return edges.lines.reshape(-1, 3)[:, 1:]
+        for face in faces:
+            edge_00 = (face[0], face[1])
+            edge_01 = (face[1], face[0])
+            face_dict[edge_00].append(face[2])
+            face_dict[edge_01].append(face[2])
+
+            edge_10 = (face[1], face[2])
+            edge_11 = (face[2], face[1])
+            face_dict[edge_10].append(face[0])
+            face_dict[edge_11].append(face[0])
+
+            edge_20 = (face[2], face[0])
+            edge_21 = (face[0], face[2])
+            face_dict[edge_20].append(face[1])
+            face_dict[edge_21].append(face[1])
+
+        # We find unique edges by adding the edge only once to a dict
+        unique_edge_dict = dict()
+        for edge in face_dict.keys():
+            if (
+                edge in unique_edge_dict.keys()
+                or tuple(reversed(edge)) in unique_edge_dict.keys()
+            ):
+                continue
+            else:
+                unique_edge_dict[edge] = 1
+
+        unique_edge_list = [list(key) for key in unique_edge_dict.keys()]
+
+        return np.array(unique_edge_list)
 
     def get_edge_opposite_points(self, faces: np.ndarray) -> Dict:
         face_dict = defaultdict(list)
@@ -116,7 +145,7 @@ def rest_edge_constraint(mesh: PBDMesh) -> PBDMesh:
     affects the next time the same point is affected in the same loop
     How would we even parallelize it?
     """
-    for edge in mesh.boundary_edges:
+    for edge in mesh.edges:
         point_0 = mesh.position_1[edge[0]]
         point_1 = mesh.position_1[edge[1]]
 

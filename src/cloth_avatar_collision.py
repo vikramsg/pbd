@@ -20,6 +20,8 @@ class Scene:
 
         self.stitching_points = stitching_points
 
+        self.compliance_stiffness = 1
+
 
 def stitch_constraint(
     rect1_mesh: PBDMesh,
@@ -35,7 +37,7 @@ def stitch_constraint(
     by subtracting new position with old position. Then we step using this velocity
     """
 
-    compliance_stiffness = 0.05 / dt / dt
+    compliance_stiffness = 0.1 / dt / dt
 
     for stitch_index in stitch_index_list:
         w1 = rect1_mesh.weights[stitch_index[0]]
@@ -79,27 +81,31 @@ def simulate(scene: Scene, dt: float) -> Scene:
         obstacle=scene.obstacle,
         stitching_points=scene.stitching_points,
     )
-    scene = Scene(
-        entities=[solve(entity, dt) for entity in scene.entities],
-        obstacle=scene.obstacle,
-        stitching_points=scene.stitching_points,
-    )
-    # ToDo: this should go in solve somehow
-    scene = Scene(
-        entities=[
-            solve_collisions(entity, scene.obstacle, dt) for entity in scene.entities
-        ],
-        obstacle=scene.obstacle,
-        stitching_points=scene.stitching_points,
-    )
+
     # ToDo: this should go in solve somehow
     scene = Scene(
         entities=[
             mesh
             for mesh in stitch_constraint(
-                scene.entities[0], scene.entities[1], scene.stitching_points, dt
+                scene.entities[0],
+                scene.entities[1],
+                scene.stitching_points,
+                dt=dt,
             )
         ],
+        obstacle=scene.obstacle,
+        stitching_points=scene.stitching_points,
+    )
+    # ToDo: this should go in solve somehow
+    # scene = Scene(
+    #     entities=[
+    #         solve_collisions(entity, scene.obstacle, dt) for entity in scene.entities
+    #     ],
+    #     obstacle=scene.obstacle,
+    #     stitching_points=scene.stitching_points,
+    # )
+    scene = Scene(
+        entities=[solve(entity, dt) for entity in scene.entities],
         obstacle=scene.obstacle,
         stitching_points=scene.stitching_points,
     )
@@ -137,16 +143,14 @@ if __name__ == "__main__":
     )
     cloth_2_triangles = cloth_2.triangulate()
 
-    stitching_points_full = matching_points(cloth_1_triangles, cloth_2_triangles)
     stitching_points = list(zip(np.arange(0, 121, 11), np.arange(0, 121, 11))) + list(
         zip(np.arange(10, 121, 11), np.arange(10, 121, 11))
     )
-    # stitching_points = stitching_points_full
 
     cloth_1_PBD = PBDMesh(cloth_1_triangles, velocity=[-0.0, 0, 0])
     cloth_2_PBD = PBDMesh(cloth_2_triangles, velocity=[0.0, 0, 0])
 
-    torso_mesh_path = Path(".").resolve() / "data" / "torso.obj"
+    torso_mesh_path = Path(".").resolve() / "data" / "spread_arms.obj"
     torso_mesh = pv.read(torso_mesh_path)
     torso_mesh_triangles = torso_mesh.triangulate()
 
@@ -159,7 +163,9 @@ if __name__ == "__main__":
 
     for _ in range(20):
         scene = simulate(scene, dt)
-        print(scene.entities[0].position_1[0], scene.entities[1].position_1[0])
+        print(
+            "bottom", scene.entities[0].position_1[0], scene.entities[1].position_1[0]
+        )
         print("velocity", scene.entities[0].velocity[0], scene.entities[1].velocity[0])
 
     plotter = pv.Plotter()
@@ -169,11 +175,11 @@ if __name__ == "__main__":
             color="green",
             show_edges=True,
         )
-    plotter.add_mesh(
-        scene.obstacle,
-        color="yellow",
-        show_edges=True,
-    )
+    # plotter.add_mesh(
+    #     scene.obstacle,
+    #     color="yellow",
+    #     show_edges=True,
+    # )
 
     plotter.show()
 
