@@ -112,6 +112,14 @@ jupyter = ["ipython (>=7.8.0)", "tokenize-rt (>=3.2.0)"]
 uvloop = ["uvloop (>=0.15.2)"]
 
 [[package]]
+name = "certifi"
+version = "2022.9.24"
+description = "Python package for providing Mozilla's CA Bundle."
+category = "main"
+optional = false
+python-versions = ">=3.6"
+
+[[package]]
 name = "cffi"
 version = "1.15.1"
 description = "Foreign Function Interface for Python calling C code."
@@ -604,6 +612,24 @@ dev = ["pre-commit", "tox"]
 testing = ["pytest", "pytest-benchmark"]
 
 [[package]]
+name = "pooch"
+version = "1.6.0"
+description = "\"Pooch manages your Python library's sample data files: it automatically downloads and stores them in a local directory, with support for versioning and corruption checks.\""
+category = "main"
+optional = false
+python-versions = ">=3.6"
+
+[package.dependencies]
+appdirs = ">=1.3.0"
+packaging = ">=20.0"
+requests = ">=2.19.0"
+
+[package.extras]
+progress = ["tqdm (>=4.41.0,<5.0.0)"]
+sftp = ["paramiko (>=2.7.0)"]
+xxhash = ["xxhash (>=1.4.3)"]
+
+[[package]]
 name = "prompt-toolkit"
 version = "3.0.32"
 description = "Library for building powerful interactive command lines in Python"
@@ -731,25 +757,25 @@ six = ">=1.5"
 
 [[package]]
 name = "pyvista"
-version = "0.36.1"
+version = "0.37.0"
 description = "Easier Pythonic interface to VTK"
 category = "main"
 optional = false
 python-versions = ">=3.7.*"
 
 [package.dependencies]
-appdirs = "*"
 imageio = "*"
 numpy = "*"
 pillow = "*"
+pooch = "*"
 scooby = ">=0.5.1"
 vtk = "*"
 
 [package.extras]
-all = ["matplotlib", "colorcet", "cmocean", "meshio (>=5.2)", "ipyvtklink", "pythreejs"]
-colormaps = ["matplotlib", "colorcet", "cmocean"]
+all = ["cmocean", "colorcet", "ipyvtklink", "matplotlib", "meshio (>=5.2)", "panel", "pythreejs"]
+colormaps = ["cmocean", "colorcet", "matplotlib"]
 io = ["meshio (>=5.2)"]
-jupyter = ["ipyvtklink", "pythreejs"]
+jupyter = ["ipyvtklink", "panel", "pythreejs"]
 
 [[package]]
 name = "pywin32"
@@ -770,6 +796,24 @@ python-versions = ">=3.6"
 [package.dependencies]
 cffi = {version = "*", markers = "implementation_name == \"pypy\""}
 py = {version = "*", markers = "implementation_name == \"pypy\""}
+
+[[package]]
+name = "requests"
+version = "2.28.1"
+description = "Python HTTP for Humans."
+category = "main"
+optional = false
+python-versions = ">=3.7, <4"
+
+[package.dependencies]
+certifi = ">=2017.4.17"
+charset-normalizer = ">=2,<3"
+idna = ">=2.5,<4"
+urllib3 = ">=1.21.1,<1.27"
+
+[package.extras]
+socks = ["PySocks (>=1.5.6,!=1.5.7)"]
+use_chardet_on_py3 = ["chardet (>=3.0.2,<6)"]
 
 [[package]]
 name = "rich"
@@ -892,6 +936,19 @@ optional = false
 python-versions = ">=3.7"
 
 [[package]]
+name = "urllib3"
+version = "1.26.12"
+description = "HTTP library with thread-safe connection pooling, file post, and more."
+category = "main"
+optional = false
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, !=3.5.*, <4"
+
+[package.extras]
+brotli = ["brotlicffi (>=0.8.0)", "brotli (>=1.0.9)", "brotlipy (>=0.6.0)"]
+secure = ["pyOpenSSL (>=0.14)", "cryptography (>=1.3.4)", "idna (>=2.0.0)", "certifi", "urllib3-secure-extra", "ipaddress"]
+socks = ["PySocks (>=1.5.6,!=1.5.7,<2.0)"]
+
+[[package]]
 name = "vtk"
 version = "9.2.2"
 description = "VTK is an open-source toolkit for 3D computer graphics, image processing, and visualization"
@@ -943,7 +1000,7 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "351c231b5b63f7254308646c851b8747769fce2caf3fb72c742991cfe6715f16"
+content-hash = "6f9f6108bb07ffa4bee5bb5f0f936e5c1724233a1a2b8fdd4bd61ea1173a31d3"
 
 [metadata.files]
 aiohttp = []
@@ -964,6 +1021,7 @@ async-timeout = [
 attrs = []
 backcall = []
 black = []
+certifi = []
 cffi = []
 charset-normalizer = []
 click = [
@@ -1090,6 +1148,7 @@ pluggy = [
     {file = "pluggy-1.0.0-py2.py3-none-any.whl", hash = "sha256:74134bbf457f031a36d68416e1509f34bd5ccc019f0bcc952c7b909d06b37bd3"},
     {file = "pluggy-1.0.0.tar.gz", hash = "sha256:4224373bacce55f955a878bf9cfa763c1e360858e330072059e10bad68531159"},
 ]
+pooch = []
 prompt-toolkit = []
 psutil = []
 ptyprocess = []
@@ -1111,6 +1170,7 @@ python-dateutil = [
 pyvista = []
 pywin32 = []
 pyzmq = []
+requests = []
 rich = []
 scipy = []
 scooby = []
@@ -1127,6 +1187,7 @@ tomli = [
 tornado = []
 traitlets = []
 typing-extensions = []
+urllib3 = []
 vtk = []
 wcwidth = []
 wslink = []
