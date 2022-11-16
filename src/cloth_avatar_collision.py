@@ -50,7 +50,7 @@ def stitch_constraint(
         dist_0 = 0
 
         # FIXME: Doing some tuning here
-        if dist < 0.1:
+        if dist < 0.05:
             compliance_stiffness = 0
 
         # PBD Distance constraint with 0 distance constraint
@@ -85,6 +85,19 @@ def simulate(scene: Scene, dt: float) -> Scene:
     # ToDo: this should go in solve somehow
     scene = Scene(
         entities=[
+            solve_collisions(entity, scene.obstacle, dt) for entity in scene.entities
+        ],
+        obstacle=scene.obstacle,
+        stitching_points=scene.stitching_points,
+    )
+    scene = Scene(
+        entities=[solve(entity, dt) for entity in scene.entities],
+        obstacle=scene.obstacle,
+        stitching_points=scene.stitching_points,
+    )
+    # ToDo: this should go in solve somehow
+    scene = Scene(
+        entities=[
             mesh
             for mesh in stitch_constraint(
                 scene.entities[0],
@@ -93,19 +106,6 @@ def simulate(scene: Scene, dt: float) -> Scene:
                 dt=dt,
             )
         ],
-        obstacle=scene.obstacle,
-        stitching_points=scene.stitching_points,
-    )
-    # ToDo: this should go in solve somehow
-    # scene = Scene(
-    #     entities=[
-    #         solve_collisions(entity, scene.obstacle, dt) for entity in scene.entities
-    #     ],
-    #     obstacle=scene.obstacle,
-    #     stitching_points=scene.stitching_points,
-    # )
-    scene = Scene(
-        entities=[solve(entity, dt) for entity in scene.entities],
         obstacle=scene.obstacle,
         stitching_points=scene.stitching_points,
     )
@@ -121,47 +121,49 @@ def simulate(scene: Scene, dt: float) -> Scene:
 
 
 if __name__ == "__main__":
-    center = np.array([0, 0, 3.5])
+    tshirt_front = pv.read(Path(".").resolve() / "data" / "avatar" / "tshirt_front.obj")
+    tshirt_back = pv.read(Path(".").resolve() / "data" / "avatar" / "tshirt_back.obj")
+    tshirt_front = tshirt_front.scale([1.1, 1.1, 1.1])
+    tshirt_back = tshirt_back.scale([1.1, 1.1, 1.1])
 
-    cloth_1 = pv.Plane(
-        center=(center + np.array([0.0, 1.5, 0])),
-        direction=(0, 1, 0),
-        i_size=7.0,
-        j_size=6.0,
-        i_resolution=10,
-        j_resolution=10,
-    )
-    cloth_1_triangles = cloth_1.triangulate()
+    tshirt_front_PBD = PBDMesh(tshirt_front, velocity=[-0.0, 0, 0])
+    tshirt_back_PBD = PBDMesh(tshirt_back, velocity=[0.0, 0, 0])
 
-    cloth_2 = pv.Plane(
-        center=(center - np.array([0.0, 1.5, 0])),
-        direction=(0, 1, 0),
-        i_size=7.0,
-        j_size=6.0,
-        i_resolution=10,
-        j_resolution=10,
-    )
-    cloth_2_triangles = cloth_2.triangulate()
+    avatar_mesh_path = Path(".").resolve() / "data" / "avatar" / "spread_arms.obj"
+    avatar_mesh = pv.read(avatar_mesh_path)
+    avatar_mesh = avatar_mesh.scale([0.01, 0.01, 0.01])
 
-    stitching_points = list(zip(np.arange(0, 121, 11), np.arange(0, 121, 11))) + list(
-        zip(np.arange(10, 121, 11), np.arange(10, 121, 11))
-    )
+    avatar_mesh_triangles = avatar_mesh.triangulate()
 
-    cloth_1_PBD = PBDMesh(cloth_1_triangles, velocity=[-0.0, 0, 0])
-    cloth_2_PBD = PBDMesh(cloth_2_triangles, velocity=[0.0, 0, 0])
-
-    torso_mesh_path = Path(".").resolve() / "data" / "spread_arms.obj"
-    torso_mesh = pv.read(torso_mesh_path)
-    torso_mesh_triangles = torso_mesh.triangulate()
+    stitching_points = [
+        (1, 1),
+        (13, 13),
+        (14, 14),
+        (2, 2),
+        (3, 3),
+        (15, 15),
+        (17, 17),
+        (18, 18),
+        (5, 5),
+        (6, 6),
+        (22, 22),
+        (21, 21),
+        (24, 24),
+        (8, 8),
+        (9, 9),
+        (25, 25),
+        (26, 26),
+        (10, 10),
+    ]
 
     dt = 0.075
     scene = Scene(
-        entities=[cloth_1_PBD, cloth_2_PBD],
-        obstacle=torso_mesh_triangles,
+        entities=[tshirt_front_PBD, tshirt_back_PBD],
+        obstacle=avatar_mesh_triangles,
         stitching_points=stitching_points,
     )
 
-    for _ in range(20):
+    for _ in range(10):
         scene = simulate(scene, dt)
         print(
             "bottom", scene.entities[0].position_1[0], scene.entities[1].position_1[0]
@@ -175,11 +177,11 @@ if __name__ == "__main__":
             color="green",
             show_edges=True,
         )
-    # plotter.add_mesh(
-    #     scene.obstacle,
-    #     color="yellow",
-    #     show_edges=True,
-    # )
+    plotter.add_mesh(
+        scene.obstacle,
+        color="yellow",
+        show_edges=True,
+    )
 
     plotter.show()
 
