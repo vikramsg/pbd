@@ -123,18 +123,18 @@ def simulate(scene: Scene, dt: float) -> Scene:
 if __name__ == "__main__":
     tshirt_front = pv.read(Path(".").resolve() / "data" / "avatar" / "tshirt_front.obj")
     tshirt_back = pv.read(Path(".").resolve() / "data" / "avatar" / "tshirt_back.obj")
-    tshirt_front = tshirt_front.scale([1.1, 1.1, 1.1])
-    tshirt_back = tshirt_back.scale([1.1, 1.1, 1.1])
 
     tshirt_front_PBD = PBDMesh(tshirt_front, velocity=[-0.0, 0, 0])
     tshirt_back_PBD = PBDMesh(tshirt_back, velocity=[0.0, 0, 0])
 
     avatar_mesh_path = Path(".").resolve() / "data" / "avatar" / "spread_arms.obj"
     avatar_mesh = pv.read(avatar_mesh_path)
+    # Scale avatar to a more realistic size
     avatar_mesh = avatar_mesh.scale([0.01, 0.01, 0.01])
 
     avatar_mesh_triangles = avatar_mesh.triangulate()
 
+    # Points obtained by investigating edge points in notebook
     stitching_points = [
         (1, 1),
         (13, 13),
